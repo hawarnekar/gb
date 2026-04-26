@@ -175,26 +175,6 @@ For full documentation:
 :help gb
 ```
 
-## Testing
-
-Offline smoke test:
-
-```sh
-vim -Nu NONE -i NONE -n -es -S test/smoke.vim
-```
-
-Networked GitHub API smoke test:
-
-```sh
-vim -Nu NONE -i NONE -n -es -S test/integration.vim
-```
-
-Networked browser layout smoke test:
-
-```sh
-vim -Nu NONE -i NONE -n -es -S test/layout.vim
-```
-
 ## Limitations
 
 - Read-only.

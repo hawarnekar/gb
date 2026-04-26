@@ -1,0 +1,510 @@
+*gb.txt*            Browse GitHub repositories without cloning
+
+==============================================================================
+CONTENTS                                                        *gb-contents*
+
+1. Overview                                                     |gb-overview|
+2. Requirements                                                 |gb-requirements|
+3. Quick start                                                  |gb-quick-start|
+4. Commands                                                     |gb-commands|
+5. Paths and accepted input                                     |gb-paths|
+6. Browser buffer                                               |gb-browser|
+7. Configuration                                                |gb-configuration|
+8. Authentication                                               |gb-authentication|
+9. Caching                                                      |gb-caching|
+10. Completion                                                  |gb-completion|
+11. Limitations                                                 |gb-limitations|
+12. Troubleshooting                                             |gb-troubleshooting|
+
+==============================================================================
+1. Overview                                                     *gb-overview*
+
+gb.vim lets Vim browse GitHub repositories without cloning them.
+
+It is read-only. It fetches repository trees and file contents through the
+GitHub REST API, then presents directories in a Vim buffer and files as normal
+read-only Vim buffers.
+
+The plugin is designed for quick source inspection:
+
+>
+  :GBrowse torvalds/linux
+  :GBrowse https://github.com/vim/vim/tree/master/runtime
+  :GBrowse git@github.com:tpope/vim-fugitive.git
+<
+
+gb.vim is not a general Git client. It does not create a working tree while
+browsing, and it does not support writes, commits, pushes, blame, or log. Use
+|:GBClone| when you explicitly want to clone the current repository locally.
+
+==============================================================================
+2. Requirements                                             *gb-requirements*
+
+Required:
+
+  Vim 8.2 or newer
+  json_decode() support
+  curl available on $PATH
+
+Recommended:
+
+  A GitHub token for private repositories or higher API rate limits
+  GitHub CLI (`gh`) if you want gb.vim to reuse `gh auth token`
+
+Check JSON support with:
+
+>
+  :echo exists('*json_decode')
+<
+
+Check curl:
+
+>
+  :echo executable('curl')
+<
+
+==============================================================================
+3. Quick start                                                *gb-quick-start*
+
+Open a repository:
+
+>
+  :GBrowse owner/repo
+<
+
+Open a repository at a branch, tag, or commit:
+
+>
+  :GBrowse owner/repo@main
+  :GBrowse owner/repo@v1.0.0
+<
+
+Paste a GitHub URL:
+
+>
+  :GBrowse https://github.com/owner/repo
+  :GBrowse https://github.com/owner/repo/blob/main/README.md
+  :GBrowse https://github.com/owner/repo/tree/main/src
+<
+
+Open a canonical Github Browser path:
+
+>
+  :edit github://owner/repo@main:/README.md
+<
+
+The internal path format includes a colon before the repository path. This
+keeps branch names containing slashes unambiguous:
+
+>
+  github://owner/repo@feature/topic:/src/main.c
+<
+
+==============================================================================
+4. Commands                                                       *gb-commands*
+
+                                                        *:GBrowse*
+:GBrowse [input]
+        Browse a GitHub repository, directory, or file.
+
+        INPUT may be:
+
+          owner/repo
+          owner/repo@ref
+          https://github.com/owner/repo
+          https://github.com/owner/repo/tree/ref/path
+          https://github.com/owner/repo/blob/ref/path
+          git@github.com:owner/repo.git
+          github://owner/repo@ref:/path
+
+        If INPUT is omitted, Vim prompts for it with command completion.
+
+                                                          *:GBOpen*
+:GBOpen {input}
+        Open INPUT after parsing it as a Github Browser path or GitHub URL. This is a
+        lower-level form of |:GBrowse| and is useful in mappings.
+
+                                                       *:GBRefresh*
+:GBRefresh
+        Clear the tree and branch cache for the current remote repository and
+        reload the current remote browser or file buffer.
+
+                                                        *:GBCopyUrl*
+:[range]GBCopyUrl
+        Copy the GitHub web URL for the current remote file or browser entry.
+
+        In a file buffer, the URL includes the current line:
+
+>
+  https://github.com/owner/repo/blob/main/file.c#L42
+<
+
+        With a range, the URL includes a line range:
+
+>
+  :10,20GBCopyUrl
+<
+
+        In a Github Browser browser buffer, the URL points at the entry under the
+        cursor and uses `/tree/` for directories and `/blob/` for files.
+
+                                                        *:GBClone*
+:GBClone
+        Prompt for a destination path and clone the current GitHub repository
+        with `git clone`.
+
+        The prompt starts empty; Github Browser does not assume a default clone
+        destination. Relative paths are accepted and passed to git exactly as
+        typed.
+
+                                                      *:GBClearCache*
+:GBClearCache
+        Clear all in-memory Github Browser caches.
+
+==============================================================================
+5. Paths and accepted input                                       *gb-paths*
+
+The canonical Github Browser path format is:
+
+>
+  github://OWNER/REPO@REF:/PATH
+<
+
+Examples:
+
+>
+  github://torvalds/linux@master:/
+  github://torvalds/linux@master:/README
+  github://vim/vim@master:/runtime/doc/help.txt
+<
+
+REF may be a branch, tag, or commit SHA. When REF is omitted in user input,
+gb.vim asks GitHub for the repository default branch and caches the result.
+
+The colon before PATH is intentional. Without it, a branch such as
+`feature/topic` cannot be distinguished from a path.
+
+Accepted user inputs:
+
+>
+  owner/repo
+  owner/repo@ref
+  git@github.com:owner/repo.git
+  https://github.com/owner/repo
+  https://github.com/owner/repo/tree/ref/path
+  https://github.com/owner/repo/blob/ref/path#L10-L20
+  github://owner/repo@ref:/path
+<
+
+Line fragments in GitHub blob URLs are used to jump to the requested line after
+the file is opened.
+
+==============================================================================
+6. Browser buffer                                             *gb-browser*
+
+|:GBrowse| opens directories in a left-side browser panel with filetype
+`gb-browser`. Pressing <CR> on a directory updates that left panel to show
+the selected directory. Pressing <CR> on a file opens the file in the editing
+window on the right and keeps focus in the browser.
+
+Example:
+
+>
+  "Quick help"
+  ============
+  Key    Action
+  ---    ------
+  Enter  Open
+  -      Parent
+  r      Refresh
+  y      Copy URL
+  c      Clone
+  q      Close
+  ------------------------
+  github://owner/repo@main:/src
+  ------------------------
+
+  ../
+  include/
+  main.c
+  util.c
+<
+
+Mappings:
+
+  <CR>    Open the file or enter the directory under the cursor
+  -       Go to the parent directory
+  r       Refresh the current repository cache
+  y       Copy the GitHub URL for the current entry
+  c       Clone the current repository locally
+  q       Close the browser buffer
+
+Browser buffers use:
+
+>
+  buftype=nofile
+  bufhidden=hide
+  noswapfile
+  readonly
+  nomodifiable
+<
+
+Remote file buffers are also read-only and unmodifiable. If a user makes a
+buffer modifiable and tries to write it, Github Browser rejects the save because
+the file is not present locally. The unsaved buffer changes are kept.
+
+==============================================================================
+7. Configuration                                           *gb-configuration*
+
+Set options before the plugin is loaded, usually in your vimrc.
+
+                                                        *g:gb_github_token*
+g:gb_github_token
+        Default: ''
+
+        Explicit GitHub token. When set, this takes precedence over all other
+        token sources.
+
+>
+  let g:gb_github_token = 'ghp_xxx'
+<
+
+        Prefer environment variables or `gh auth token` over writing tokens in
+        plain text Vim config.
+
+                                                        *g:gb_use_gh_token*
+g:gb_use_gh_token
+        Default: 1
+
+        When enabled and no explicit token or $GITHUB_TOKEN is set, gb.vim
+        tries:
+
+>
+  gh auth token
+<
+
+        Disable this if you do not want gb.vim to shell out to `gh`:
+
+>
+  let g:gb_use_gh_token = 0
+<
+
+                                                           *g:gb_cache_ttl*
+g:gb_cache_ttl
+        Default: 300
+
+        Number of seconds before search and branch completion cache entries
+        expire. Tree and content caches remain until refreshed or cleared.
+
+        Set to 0 to keep completion cache entries for the whole Vim session:
+
+>
+  let g:gb_cache_ttl = 0
+<
+
+                                                        *g:gb_curl_command*
+g:gb_curl_command
+        Default: 'curl'
+
+        Name or path of the curl executable.
+
+>
+  let g:gb_curl_command = '/opt/homebrew/bin/curl'
+<
+
+                                                      *g:gb_github_api_url*
+g:gb_github_api_url
+        Default: 'https://api.github.com'
+
+        GitHub API base URL. This can be pointed at a GitHub Enterprise API
+        endpoint if its API shape is compatible:
+
+>
+  let g:gb_github_api_url = 'https://github.example.com/api/v3'
+<
+
+                                                   *g:gb_browser_show_hidden*
+g:gb_browser_show_hidden
+        Default: 1
+
+        Show dotfiles in browser buffers.
+
+>
+  let g:gb_browser_show_hidden = 0
+<
+
+                                                     *g:gb_browser_show_help*
+g:gb_browser_show_help
+        Default: 1
+
+        Show a compact keybinding header in Github Browser browser buffers.
+
+>
+  let g:gb_browser_show_help = 0
+<
+
+                                                        *g:gb_browser_width*
+g:gb_browser_width
+        Default: 32
+
+        Width, in columns, of the left-side browser panel opened by
+        |:GBrowse|.
+
+>
+  let g:gb_browser_width = 40
+<
+
+==============================================================================
+8. Authentication                                         *gb-authentication*
+
+Public repositories work without a token, but unauthenticated GitHub API access
+has a much lower rate limit.
+
+Token lookup order:
+
+  1. |g:gb_github_token|
+  2. $GITHUB_TOKEN
+  3. `gh auth token`, when |g:gb_use_gh_token| is enabled
+  4. unauthenticated requests
+
+Recommended setup:
+
+>
+  export GITHUB_TOKEN=ghp_xxx
+<
+
+or:
+
+>
+  gh auth login
+<
+
+Private repositories require a token with access to the repository.
+
+==============================================================================
+9. Caching                                                       *gb-caching*
+
+gb.vim keeps all caches in memory for the current Vim session.
+
+Tree cache:
+
+  Keyed by owner/repo@ref. The first access fetches the recursive Git tree.
+  Directory listings and path checks reuse this cache.
+
+Content cache:
+
+  Keyed by blob SHA. If the same content appears at multiple paths or refs, it
+  is fetched once.
+
+Default branch cache:
+
+  Keyed by owner/repo.
+
+Branch and search cache:
+
+  Keyed by repository or search query and controlled by |g:gb_cache_ttl|.
+
+Refresh the current repository:
+
+>
+  :GBRefresh
+<
+
+Clear everything:
+
+>
+  :GBClearCache
+<
+
+==============================================================================
+10. Completion                                               *gb-completion*
+
+|:GBrowse| uses custom command completion.
+
+Repository search starts after three characters:
+
+>
+  :GBrowse vim
+<
+
+Owner-qualified search:
+
+>
+  :GBrowse tpope/vim
+<
+
+Branch completion starts after `@`:
+
+>
+  :GBrowse tpope/vim-fugitive@
+<
+
+Search results are cached according to |g:gb_cache_ttl|.
+
+==============================================================================
+11. Limitations                                             *gb-limitations*
+
+gb.vim is read-only.
+
+It currently supports GitHub only.
+
+It uses the GitHub REST API, not the Git protocol. This is intentional: the
+plugin is optimized for browsing, not cloning.
+
+GitHub web URLs with branch names containing slashes are ambiguous because the
+URL path does not mark where the ref ends and the file path begins. Use
+canonical Github Browser paths for those refs:
+
+>
+  github://owner/repo@feature/topic:/path/to/file
+<
+
+Very large repositories may return truncated recursive trees. gb.vim then
+falls back to fetching directories on demand through the Contents API.
+
+Timestamps, ownership, permissions, and Git metadata are not represented as a
+local filesystem.
+
+==============================================================================
+12. Troubleshooting                                     *gb-troubleshooting*
+
+JSON error:
+
+  Your Vim likely lacks json_decode(). Check:
+
+>
+  :echo exists('*json_decode')
+<
+
+curl not found:
+
+  Install curl or configure:
+
+>
+  let g:gb_curl_command = '/path/to/curl'
+<
+
+Rate limit or 403:
+
+  Configure authentication with $GITHUB_TOKEN or `gh auth login`.
+
+404 for a private repo:
+
+  The token is missing, invalid, or lacks access to that repository.
+
+Branch with slash opens wrong path:
+
+  Use canonical syntax:
+
+>
+  :edit github://owner/repo@feature/topic:/README.md
+<
+
+Remote buffer cannot be saved:
+
+  Github Browser buffers are backed by GitHub API responses, not local files.
+  A failed write keeps your buffer changes, but the plugin will not save them
+  back to GitHub. Clone the repository or write to a local path instead.
+
+==============================================================================
+ vim:tw=78:ts=8:ft=help:norl:

@@ -206,4 +206,4 @@ vim -Nu NONE -i NONE -n -es -S test/layout.vim
 
 ## License
 
-Add a project license before publishing.
+This project is licensed under the GNU GPLv3 - see the [LICENSE](LICENSE) file for details.

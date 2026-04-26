@@ -37,7 +37,7 @@ Check your Vim:
 ### vim-plug
 
 ```vim
-Plug 'your-name/gb.vim'
+Plug 'hawarnekar/gb.vim'
 ```
 
 Then run:
@@ -51,7 +51,7 @@ Then run:
 
 ```sh
 cd ~/.vim/bundle
-git clone https://github.com/your-name/gb.vim.git
+git clone https://github.com/hawarnekar/gb.vim.git
 vim -c 'helptags ~/.vim/bundle/gb.vim/doc' -c 'qa!'
 ```
 
@@ -59,11 +59,9 @@ vim -c 'helptags ~/.vim/bundle/gb.vim/doc' -c 'qa!'
 
 ```sh
 mkdir -p ~/.vim/pack/plugins/start
-git clone https://github.com/your-name/gb.vim.git ~/.vim/pack/plugins/start/gb.vim
+git clone https://github.com/hawarnekar/gb.vim.git ~/.vim/pack/plugins/start/gb.vim
 vim -c 'helptags ~/.vim/pack/plugins/start/gb.vim/doc' -c 'qa!'
 ```
-
-Replace `your-name/gb.vim` with the actual repository path.
 
 ## Quick Start
 
